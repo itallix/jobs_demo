@@ -15,6 +15,7 @@ This project is an asynchronous job scheduler implemented in Python using FastAP
 - `POST /api/jobs` — Submit a new job.
 - `GET /api/jobs` — List all jobs.
 - `GET /api/jobs/{job_id}` — Get details of a specific job.
+- `PATCH /api/jobs/{job_id}/cancel` — Cancel a specific job.
 - `GET /api/jobs/{job_id}/stream` — Stream job status updates.
 
 ## Quick Start

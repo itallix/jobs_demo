@@ -16,6 +16,7 @@ class JobsQueue:
         self._by_id: dict[UUID, Job] = {}
         self._order: list[UUID] = [] # preserve submit order for listing
         self._lock = asyncio.Lock()
+        self._cancelling: set[UUID] = set()
 
     async def submit(self, job: Job) -> None:
         """Submit a new job to the queue."""
@@ -40,4 +41,24 @@ class JobsQueue:
 
     def list_non_completed(self) -> list[Job]:
         """List all non-completed jobs."""
-        return [job for job in self._by_id.values() if job.status not in (JobStatus.DONE, JobStatus.FAILED)]
+        return [job for job in self._by_id.values() if job.status < JobStatus.DONE]
+
+    def cancel(self, job_id: UUID) -> bool:
+        """Mark a job as cancelled. If the job is pending, it will be removed from the queue."""
+        job = self._by_id.get(job_id)
+        if not job or job.status >= JobStatus.DONE:
+            return False
+        if job.status == JobStatus.PENDING:
+            job.cancel()
+            logger.info("Cancelled pending job %s", job_id)
+            return True
+        elif job.status == JobStatus.RUNNING:
+            job.cancelling()
+            self._cancelling.add(job_id)
+            logger.info("Marked running job %s for cancellation", job_id)
+            return True
+        return False
+
+    def is_cancelling(self, job_id: UUID) -> bool:
+        """Check if a job is marked as being cancelled."""
+        return job_id in self._cancelling

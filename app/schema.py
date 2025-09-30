@@ -29,8 +29,9 @@ class SubmitJobRequest(BaseModel):
 
 class JobView(BaseModel):
     id: UUID
-    status: JobStatus
+    status: str
     progress: float
+    message: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
@@ -38,7 +39,11 @@ class JobView(BaseModel):
         "json_schema_extra": {
             "example": {
                 "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-                "status": "completed",
+                "status": "done",
+                "progress": 100.0,
+                "message": "Training completed successfully",
+                "started_at": "2023-10-01T12:00:00Z",
+                "finished_at": "2023-10-01T12:30:00Z",
             }
         }
     }
@@ -47,8 +52,9 @@ class JobView(BaseModel):
     def of(job: Job) -> "JobView":
         return JobView(
             id=job.id,
-            status=job.status,
+            status=job.status.name,
             progress=job.progress,
+            message=job.message,
             started_at=datetime.fromtimestamp(job.started_at, tz=timezone.utc) if job.started_at else None,
-            finished_at=datetime.fromtimestamp(job.updated_at, tz=timezone.utc) if job.status in (JobStatus.DONE, JobStatus.FAILED) else None
+            finished_at=datetime.fromtimestamp(job.updated_at, tz=timezone.utc) if job.status >= JobStatus.DONE else None
         )

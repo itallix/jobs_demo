@@ -28,7 +28,7 @@ def detect_gpu_slots(default: int = 1) -> int:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     q = JobsQueue()
     trainer = OTXTrainer()
-    pool = TaskPool(q=q, trainer=trainer, gpu_slots=detect_gpu_slots())
+    pool = TaskPool(q=q, trainer=trainer, max_concurrent_jobs=detect_gpu_slots())
     await pool.start()
 
     app.state.queue = q
