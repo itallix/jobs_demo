@@ -33,15 +33,14 @@ class TaskPool:
     async def _supervise_loop(self) -> None:
         while self._running:
             try:
-                while self._sema._value > 0:
-                    job = await self._q.next()
-                    await self._dispatch(job)
+                job = await self._q.next()
+                await self._sema.acquire()
+                self._start_job(job)
             except Exception:
                 logger.exception("Exception during supervise loop")
             await asyncio.sleep(0.5)
 
-    async def _dispatch(self, job: Job) -> None:
-        await self._sema.acquire()
+    def _start_job(self, job: Job) -> None:
         job.start()
         task = asyncio.create_task(self._run_job(job))
         self._tasks.add(task)
@@ -54,7 +53,7 @@ class TaskPool:
         try:
             await self._trainer.train(job, report)
         except Exception as e:
-            logger.exception(f"Job {job.id} failed")
+            logger.exception("Job %s failed", job.id)
             job.fail(str(e))
             return
 

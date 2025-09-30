@@ -9,7 +9,7 @@ from starlette.responses import StreamingResponse
 
 from app.job_queue import JobsQueue
 from app.models import Job, JobStatus, now_utc_ts
-from app.routers.depedencies import get_queue
+from app.routers.dependencies import get_queue
 from app.schema import JobView, SubmitJobRequest
 
 logger = logging.getLogger(__name__)
@@ -45,8 +45,8 @@ async def stream(job_id: UUID, request: Request, queue: Annotated[JobsQueue, Dep
             j = queue.get(job_id)
             if not j:
                 break
-            snap = json.dumps(JobView.of(j).model_dump_json())
-            logger.info(f"Snap: {snap}")
+            snap = JobView.of(j).model_dump_json()
+            logger.info("snap: %s", snap)
             if snap != last:
                 yield f"data: {snap}\n\n"
                 last = snap

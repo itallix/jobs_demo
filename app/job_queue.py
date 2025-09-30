@@ -22,8 +22,7 @@ class JobsQueue:
         async with self._lock:
             self._by_id[job.id] = job
             self._order.append(job.id)
-            logger.info(f"Submitted job {job.id}")
-            logger.info(self._by_id.values())
+            logger.info("Submitted %s job", job.id)
             await self._queue.put(job)
 
     async def next(self) -> Job:
