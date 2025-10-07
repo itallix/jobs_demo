@@ -3,11 +3,11 @@ import contextlib
 import logging
 import threading
 
-from app.capacity import Capacity
-from app.job_queue import JobsQueue
+from app.job_control.capacity import Capacity
+from app.job_control.queue import JobQueue
 from app.models import Job
-from app.runner.base import RunnerFactory
-from app.training.events import Progress, Done, Failed, Cancelled
+from app.runners.base import RunnerFactory
+from app.trainers.events import Progress, Done, Failed, Cancelled
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class JobScheduler:
         affect the main application.
     """
 
-    def __init__(self, jobs_queue: JobsQueue, runner_factory: RunnerFactory, max_parallel_jobs: int) -> None:
+    def __init__(self, jobs_queue: JobQueue, runner_factory: RunnerFactory, max_parallel_jobs: int) -> None:
         self._jobs_q = jobs_queue
         self._runner_factory = runner_factory
         self._capacity = Capacity(max_parallel_jobs)

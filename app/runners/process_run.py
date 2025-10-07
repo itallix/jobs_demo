@@ -7,8 +7,8 @@ from typing import Callable
 from typing import Iterator
 
 from app.models import Job
-from app.training.events import Done, Failed, TrainingEvent
-from app.training.base import Trainer, TrainerFactory
+from app.trainers.events import Done, Failed, TrainingEvent
+from app.trainers.base import Trainer, TrainerFactory
 
 
 class ProcessRun:
@@ -66,7 +66,7 @@ class ProcessRun:
 
 
 def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection, cancel_event: mp.synchronize.Event) -> None:
-    from app.training.events import Progress, Done, Cancelled, Failed
+    from app.trainers.events import Progress, Done, Cancelled, Failed
     import traceback
     class CancelledExc(Exception): pass
 

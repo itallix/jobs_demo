@@ -8,7 +8,7 @@ from app.models import Job, JobStatus
 logger = logging.getLogger(__name__)
 
 
-class JobsQueue:
+class JobQueue:
     """Holds all jobs in memory: provides FIFO order and state queries."""
 
     def __init__(self) -> None:

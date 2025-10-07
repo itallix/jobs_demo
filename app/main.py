@@ -7,10 +7,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.job_queue import JobsQueue
-from app.job_scheduler import JobScheduler
-from app.training import DummyTrainer, TrainerFactory
-from app.runner import ProcessRunnerFactory
+from app.job_control import JobQueue, JobScheduler
+from app.trainers import DummyTrainer, TrainerFactory
+from app.runners import ProcessRunnerFactory
 from app.routers import job_router
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ def detect_gpu_slots(default: int = 1) -> int:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    q = JobsQueue()
+    q = JobQueue()
     trainer_factory = TrainerFactory(DummyTrainer)
     process_runner_factory = ProcessRunnerFactory(trainer_factory)
     job_scheduler = JobScheduler(jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots())

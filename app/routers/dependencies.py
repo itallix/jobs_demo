@@ -1,7 +1,7 @@
 from fastapi import Request
 
-from app.job_queue import JobsQueue
+from app.job_control import JobQueue
 
 
-def get_queue(request: Request) -> JobsQueue:
+def get_queue(request: Request) -> JobQueue:
     return request.app.state.queue

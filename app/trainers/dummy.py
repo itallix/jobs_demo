@@ -2,7 +2,7 @@ import logging
 import time
 
 from app.models import Job
-from app.training.base import Trainer, ReportFn, HeartbeatFn
+from app.trainers.base import Trainer, ReportFn, HeartbeatFn
 
 logger = logging.getLogger(__name__)
 

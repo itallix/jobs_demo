@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, status, Depends, Request, HTTPException
 from starlette.responses import StreamingResponse
 
-from app.job_queue import JobsQueue
+from app.job_control import JobQueue
 from app.models import Job, JobStatus, now_utc_ts
 from app.routers.dependencies import get_queue
 from app.schema import JobView, SubmitJobRequest
@@ -16,24 +16,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
 
 @router.post("", response_model=JobView, status_code=status.HTTP_202_ACCEPTED)
-async def submit(req: SubmitJobRequest, queue: Annotated[JobsQueue, Depends(get_queue)]) -> JobView:
+async def submit(req: SubmitJobRequest, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
     job = Job(id = req.id, status=JobStatus.PENDING, submitted_at=now_utc_ts())
     await queue.submit(job)
     return JobView.of(job)
 
 @router.get("", response_model=list[JobView])
-async def list_jobs(queue: Annotated[JobsQueue, Depends(get_queue)]) -> list[JobView]:
+async def list_jobs(queue: Annotated[JobQueue, Depends(get_queue)]) -> list[JobView]:
     return [JobView.of(job) for job in queue.list_all()]
 
 @router.get("/{job_id}", response_model=JobView)
-async def get_job(job_id: UUID, queue: Annotated[JobsQueue, Depends(get_queue)]) -> JobView:
+async def get_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
     job = queue.get(job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return JobView.of(job)
 
 @router.patch("/{job_id}/cancel", response_model=JobView, status_code=status.HTTP_202_ACCEPTED)
-async def cancel_job(job_id: UUID, queue: Annotated[JobsQueue, Depends(get_queue)]) -> JobView:
+async def cancel_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
     result = queue.cancel(job_id)
     # todo: distinguish between not found and already completed (consider other states)
     if not result:
@@ -42,7 +42,7 @@ async def cancel_job(job_id: UUID, queue: Annotated[JobsQueue, Depends(get_queue
     return JobView.of(job)
 
 @router.get("/{job_id}/stream")
-async def stream(job_id: UUID, request: Request, queue: Annotated[JobsQueue, Depends(get_queue)]):
+async def stream(job_id: UUID, request: Request, queue: Annotated[JobQueue, Depends(get_queue)]):
     if not queue.get(job_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 

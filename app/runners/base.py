@@ -1,6 +1,6 @@
 from typing import Protocol, Iterator
 
-from app.training.events import TrainingEvent
+from app.trainers.events import TrainingEvent
 
 
 class Runner(Protocol):
