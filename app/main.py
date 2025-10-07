@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.job_queue import JobsQueue
 from app.task_pool import TaskPool
-from app.trainer import OTXTrainer
+from app.training import DummyTrainer, TrainerFactory
+from app.runner import ProcessRunnerFactory
 from app.routers import job_router
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ def detect_gpu_slots(default: int = 1) -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     q = JobsQueue()
-    trainer = OTXTrainer()
-    pool = TaskPool(q=q, trainer=trainer, max_concurrent_jobs=detect_gpu_slots())
+    trainer_factory = TrainerFactory(DummyTrainer)
+    process_runner_factory = ProcessRunnerFactory(trainer_factory)
+    pool = TaskPool(jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots())
     await pool.start()
 
     app.state.queue = q

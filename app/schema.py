@@ -32,6 +32,7 @@ class JobView(BaseModel):
     status: str
     progress: float
     message: str | None = None
+    error: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
@@ -42,6 +43,7 @@ class JobView(BaseModel):
                 "status": "done",
                 "progress": 100.0,
                 "message": "Training completed successfully",
+                "error": None,
                 "started_at": "2023-10-01T12:00:00Z",
                 "finished_at": "2023-10-01T12:30:00Z",
             }
@@ -55,6 +57,7 @@ class JobView(BaseModel):
             status=job.status.name,
             progress=job.progress,
             message=job.message,
+            error=job.error,
             started_at=datetime.fromtimestamp(job.started_at, tz=timezone.utc) if job.started_at else None,
             finished_at=datetime.fromtimestamp(job.updated_at, tz=timezone.utc) if job.status >= JobStatus.DONE else None
         )

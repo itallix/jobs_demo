@@ -16,20 +16,27 @@ class JobsQueue:
         self._by_id: dict[UUID, Job] = {}
         self._order: list[UUID] = [] # preserve submit order for listing
         self._lock = asyncio.Lock()
-        self._cancelling: set[UUID] = set()
 
     async def submit(self, job: Job) -> None:
         """Submit a new job to the queue."""
         async with self._lock:
             self._by_id[job.id] = job
             self._order.append(job.id)
-            logger.info("Submitted %s job", job.id)
+            logger.info("Submitted job", extra={"job_id": job.id})
             await self._queue.put(job)
 
-    async def next(self) -> Job:
-        """Get the next job from the queue (FIFO order)."""
-        job = await self._queue.get()
-        return job
+    async def next_runnable(self) -> Job | None:
+        """Get the next non-canceled job from the queue (FIFO order)."""
+        while True:
+            job = await self._queue.get()
+            if job.status == JobStatus.CANCELLED:
+                logger.info("Skipping cancelled job", extra={"job_id": job.id})
+                continue
+            logger.debug(
+                "Retrieved job from queue",
+                extra={"job_id": job.id, "status": job.status}
+            )
+            return job
 
     def get(self, job_id: UUID) -> Job | None:
         """Get a job by its ID."""
@@ -50,15 +57,15 @@ class JobsQueue:
             return False
         if job.status == JobStatus.PENDING:
             job.cancel()
-            logger.info("Cancelled pending job %s", job_id)
+            logger.info("Cancelled pending job", extra={"job_id": job_id})
             return True
         elif job.status == JobStatus.RUNNING:
             job.cancelling()
-            self._cancelling.add(job_id)
-            logger.info("Marked running job %s for cancellation", job_id)
+            logger.info("Marked running job for cancellation", extra={"job_id": job_id})
             return True
         return False
 
     def is_cancelling(self, job_id: UUID) -> bool:
         """Check if a job is marked as being cancelled."""
-        return job_id in self._cancelling
+        job = self._by_id.get(job_id)
+        return job is not None and job.status == JobStatus.CANCELLING

@@ -59,7 +59,7 @@ async def stream(job_id: UUID, request: Request, queue: Annotated[JobsQueue, Dep
             if snap != last:
                 yield f"data: {snap}\n\n"
                 last = snap
-            if j.status > JobStatus.DONE:
+            if j.status >= JobStatus.DONE:
                 break
             await asyncio.sleep(0.1)
 
