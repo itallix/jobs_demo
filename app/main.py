@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.job_queue import JobsQueue
-from app.task_pool import TaskPool
+from app.job_scheduler import JobScheduler
 from app.training import DummyTrainer, TrainerFactory
 from app.runner import ProcessRunnerFactory
 from app.routers import job_router
@@ -30,8 +30,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     q = JobsQueue()
     trainer_factory = TrainerFactory(DummyTrainer)
     process_runner_factory = ProcessRunnerFactory(trainer_factory)
-    pool = TaskPool(jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots())
-    await pool.start()
+    job_scheduler = JobScheduler(jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots())
+    await job_scheduler.start()
 
     app.state.queue = q
 
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     yield
 
     # TODO: persist pending jobs from queue to DB
-    await pool.stop()
+    await job_scheduler.stop()
 
     logger.info("Application shutdown completed")
 

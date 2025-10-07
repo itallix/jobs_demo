@@ -12,7 +12,7 @@ from app.training.events import Progress, Done, Failed, Cancelled
 logger = logging.getLogger(__name__)
 
 
-class TaskPool:
+class JobScheduler:
     """
     Event-driven control plane for jobs.
 
