@@ -3,14 +3,14 @@ from typing import Callable, Protocol
 from app.models import Job
 
 
-ReportFunction = Callable[[float], None]
-HeartbeatFunction = Callable[[], None]
+ReportFn = Callable[[float], None]
+HeartbeatFn = Callable[[], None]
 
 
 class Trainer(Protocol):
     """Trainer interface."""
 
-    def train(self, job: Job, report: ReportFunction, heartbeat: HeartbeatFunction) -> None: ...
+    def train(self, job: Job, report: ReportFn, heartbeat: HeartbeatFn) -> None: ...
 
 
 class TrainerFactory:

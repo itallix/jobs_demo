@@ -1,5 +1,5 @@
 from .base import Trainer, TrainerFactory
-from .trainer import DummyTrainer
+from .dummy import DummyTrainer
 
 __all__ = [
     "DummyTrainer",

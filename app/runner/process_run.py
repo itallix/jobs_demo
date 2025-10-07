@@ -65,12 +65,12 @@ class ProcessRun:
         self._parent.close()
 
 
-def _entrypoint(trainer_factory: TrainerFactory, job_payload: str, conn: Connection, cancel_event: mp.synchronize.Event) -> None:
+def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection, cancel_event: mp.synchronize.Event) -> None:
     from app.training.events import Progress, Done, Cancelled, Failed
     import traceback
     class CancelledExc(Exception): pass
 
-    trainer = trainer_factory()
+    trainer = get_trainer()
     job = Job.model_validate_json(job_payload)
 
     def report(p: float):
@@ -96,6 +96,7 @@ class ProcessRunnerFactory:
     """Process-based infra with spawned context"""
 
     def __init__(self, trainer_factory: Callable[[], Trainer]) -> None:
+        # consider using native context for python 3.14 due to upgrade to 'fork_server' model
         self._ctx = mp.get_context("spawn")
         self._trainer_factory = trainer_factory
 
