@@ -19,7 +19,7 @@ class JobScheduler:
     Runs the training job in a separate context and handles communication with it via domain events.
 
     Note: Job orchestration is performed using asyncio to keep the event loop responsive.
-    Training itself runs in a context defined by running factory:
+    Training itself runs in a context defined by runner factory:
         - process-based runner make sure CPU-bound tasks do not block the event loop and crashes in training do not
         affect the main application.
     """
