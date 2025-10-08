@@ -1,21 +1,22 @@
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import os
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.job_control import JobQueue, JobScheduler
-from app.trainers import DummyTrainer, TrainerFactory
-from app.runners import ProcessRunnerFactory
 from app.routers import job_router
+from app.runners import ProcessRunnerFactory
+from app.trainers import DummyTrainer, TrainerFactory
 
 logger = logging.getLogger(__name__)
 
 
 def detect_gpu_slots(default: int = 1) -> int:
+    """Detect the number of GPU slots available for running jobs."""
     if "GPU_SLOTS" in os.environ:
         try:
             return max(1, int(os.environ["GPU_SLOTS"]))
@@ -26,10 +27,13 @@ def detect_gpu_slots(default: int = 1) -> int:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """Lifespan context manager to handle startup and shutdown events."""
     q = JobQueue()
     trainer_factory = TrainerFactory(DummyTrainer)
     process_runner_factory = ProcessRunnerFactory(trainer_factory)
-    job_scheduler = JobScheduler(jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots())
+    job_scheduler = JobScheduler(
+        jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots()
+    )
     await job_scheduler.start()
 
     app.state.queue = q
@@ -44,8 +48,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("Application shutdown completed")
 
 
-
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
     app = FastAPI(lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
@@ -61,6 +65,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     return app
+
 
 app = create_app()
 

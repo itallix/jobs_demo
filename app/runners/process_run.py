@@ -1,14 +1,15 @@
 import asyncio
 import contextlib
 import multiprocessing as mp
+from collections.abc import Callable, Iterator
 from multiprocessing.connection import Connection
+from multiprocessing.context import SpawnProcess
 from multiprocessing.synchronize import Event
-from typing import Callable
-from typing import Iterator
 
 from app.models import Job
-from app.trainers.events import Done, Failed, TrainingEvent
+from app.runners.base import Runner
 from app.trainers.base import Trainer, TrainerFactory
+from app.trainers.events import Done, Failed, Started, TrainingEvent
 
 
 class ProcessRun:
@@ -20,13 +21,13 @@ class ProcessRun:
         self._job = job
         self._parent, self._child = ctx.Pipe(duplex=False)
         self._cancel = ctx.Event()
-        self._proc: mp.Process | None = None
+        self._proc: SpawnProcess | None = None
 
     def start(self) -> "ProcessRun":
         self._proc = self._ctx.Process(
             target=_entrypoint,
             args=(self._trainer_factory, self._job.model_dump_json(), self._child, self._cancel),
-            name=f"trainer-{self._job.id}"
+            name=f"trainer-{self._job.id}",
         )
         self._proc.start()
         self._child.close()
@@ -45,30 +46,36 @@ class ProcessRun:
         finally:
             self._parent.close()
 
-    async def stop(self, timeout: float = 6.0) -> None:
+    async def stop(self, wait_for: float = 6.0, kill_timeout: float = 1.0) -> None:
+        """Stop the training process.
+
+        Args:
+            wait_for: How long to wait for graceful shutdown (seconds)
+            kill_timeout: How long to wait for process.join() after killing (seconds)
+        """
         if self._proc is None:
             return
 
         self._cancel.set()
-        step = 0.2
 
-        for _ in range(int(timeout/step)):
-            if not self._proc.is_alive():
-                return
-            await asyncio.sleep(step)
-
-        if self._proc.is_alive():
-            self._proc.kill()
-
-        await asyncio.to_thread(self._proc.join, timeout=1.0)
+        try:
+            await asyncio.to_thread(self._proc.join, timeout=wait_for)
+        except TimeoutError:
+            if self._proc.is_alive():
+                self._proc.kill()
+                # Give it a final chance to clean up
+                await asyncio.to_thread(self._proc.join, timeout=kill_timeout)
 
         self._parent.close()
 
 
-def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection, cancel_event: mp.synchronize.Event) -> None:
-    from app.trainers.events import Progress, Done, Cancelled, Failed
+def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection, cancel_event: Event) -> None:
     import traceback
-    class CancelledExc(Exception): pass
+
+    from app.trainers.events import Cancelled, Done, Failed, Progress
+
+    class CancelledExc(Exception):
+        pass
 
     trainer = get_trainer()
     job = Job.model_validate_json(job_payload)
@@ -76,13 +83,14 @@ def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection,
     def report(p: float):
         conn.send(Progress(float(p)))
 
-    # alt: another possible solution is to run the heartbeat in a separate daemon thread at a set interval, so it isn’t
+    # alt: another possible solution is to run the heartbeat in a separate daemon thread at a set interval, so it is not
     # coupled to the training process.
     def heartbeat():
         if cancel_event.is_set():
-            raise CancelledExc()
+            raise CancelledExc
 
     try:
+        conn.send(Started())
         trainer.train(job, report, heartbeat)
         conn.send(Done())
     except CancelledExc:
@@ -102,5 +110,5 @@ class ProcessRunnerFactory:
         self._ctx = mp.get_context("spawn")
         self._trainer_factory = trainer_factory
 
-    def for_job(self, job: Job) -> ProcessRun:
+    def for_job(self, job: Job) -> Runner:
         return ProcessRun(self._ctx, self._trainer_factory, job)

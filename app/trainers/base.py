@@ -1,7 +1,7 @@
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from app.models import Job
-
 
 ReportFn = Callable[[float], None]
 HeartbeatFn = Callable[[], None]

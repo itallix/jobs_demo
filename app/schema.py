@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ class SubmitJobRequest(BaseModel):
     id: UUID
     project_id: UUID | None = Field(None, description="Project ID")
     model_revision_id: UUID | None = Field(None, description="Model revision ID")
-    payload: dict | None  = Field(None, description="Training job configuration")
+    payload: dict | None = Field(None, description="Training job configuration")
 
     model_config = {
         "json_schema_extra": {
@@ -26,6 +26,7 @@ class SubmitJobRequest(BaseModel):
             }
         }
     }
+
 
 class JobView(BaseModel):
     id: UUID
@@ -58,6 +59,6 @@ class JobView(BaseModel):
             progress=job.progress,
             message=job.message,
             error=job.error,
-            started_at=datetime.fromtimestamp(job.started_at, tz=timezone.utc) if job.started_at else None,
-            finished_at=datetime.fromtimestamp(job.updated_at, tz=timezone.utc) if job.status >= JobStatus.DONE else None
+            started_at=datetime.fromtimestamp(job.started_at, tz=UTC) if job.started_at else None,
+            finished_at=datetime.fromtimestamp(job.updated_at, tz=UTC) if job.status >= JobStatus.DONE else None,
         )

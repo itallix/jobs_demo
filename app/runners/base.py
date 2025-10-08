@@ -1,5 +1,7 @@
-from typing import Protocol, Iterator
+from collections.abc import Iterator
+from typing import Protocol
 
+from app.models import Job
 from app.trainers.events import TrainingEvent
 
 
@@ -12,7 +14,7 @@ class Runner(Protocol):
 
     def start(self) -> "Runner": ...
     def events(self) -> Iterator[TrainingEvent]: ...
-    async def stop(self, timeout: float | None = None) -> None: ...
+    async def stop(self, wait_for: float = 6.0, kill_timeout: float = 1.0) -> None: ...
 
 
 class RunnerFactory(Protocol):
@@ -20,4 +22,4 @@ class RunnerFactory(Protocol):
     Protocol for a factory that creates Runner instances for specific jobs.
     """
 
-    def for_job(self, job) -> Runner: ...
+    def for_job(self, job: Job) -> Runner: ...

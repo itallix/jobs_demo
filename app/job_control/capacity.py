@@ -1,19 +1,21 @@
 import asyncio
+from types import TracebackType
+
 
 class _Permit:
-
     def __init__(self, sem: asyncio.Semaphore):
         self._sem = sem
 
     async def __aenter__(self):
         await self._sem.acquire()
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ):
         self._sem.release()
 
 
 class Capacity:
-
     def __init__(self, n: int):
         self._sem = asyncio.Semaphore(max(1, n))
 

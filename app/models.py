@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import IntEnum
 from uuid import UUID
 
@@ -15,8 +15,11 @@ class JobStatus(IntEnum):
     FAILED = 11
     CANCELLED = 12
 
+
 def now_utc_ts() -> float:
-    return datetime.now(tz=timezone.utc).timestamp()
+    """Get the current UTC timestamp as a float."""
+    return datetime.now(tz=UTC).timestamp()
+
 
 class Job(BaseModel):
     id: UUID

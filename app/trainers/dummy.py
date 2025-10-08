@@ -2,13 +2,12 @@ import logging
 import time
 
 from app.models import Job
-from app.trainers.base import Trainer, ReportFn, HeartbeatFn
+from app.trainers.base import HeartbeatFn, ReportFn, Trainer
 
 logger = logging.getLogger(__name__)
 
 
 class DummyTrainer(Trainer):
-
     def train(self, job: Job, report: ReportFn, heartbeat: HeartbeatFn) -> None:
         logger.info("Training started. Job ID: %s", job.id)
         # Implement OTX training logic here

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-
 from uuid import UUID
 
 from app.models import Job, JobStatus
@@ -14,7 +13,7 @@ class JobQueue:
     def __init__(self) -> None:
         self._queue: asyncio.Queue = asyncio.Queue()
         self._by_id: dict[UUID, Job] = {}
-        self._order: list[UUID] = [] # preserve submit order for listing
+        self._order: list[UUID] = []  # preserve submit order for listing
         self._lock = asyncio.Lock()
 
     async def submit(self, job: Job) -> None:
@@ -27,16 +26,12 @@ class JobQueue:
 
     async def next_runnable(self) -> Job | None:
         """Get the next non-canceled job from the queue (FIFO order)."""
-        while True:
-            job = await self._queue.get()
-            if job.status == JobStatus.CANCELLED:
-                logger.info("Skipping cancelled job", extra={"job_id": job.id})
-                continue
-            logger.debug(
-                "Retrieved job from queue",
-                extra={"job_id": job.id, "status": job.status}
-            )
-            return job
+        job = await self._queue.get()
+        if job.status == JobStatus.CANCELLED:
+            logger.info("Skipping cancelled job", extra={"job_id": job.id})
+            return None
+        logger.debug("Retrieved job from queue", extra={"job_id": job.id, "status": job.status})
+        return job
 
     def get(self, job_id: UUID) -> Job | None:
         """Get a job by its ID."""
@@ -59,7 +54,7 @@ class JobQueue:
             job.cancel()
             logger.info("Cancelled pending job", extra={"job_id": job_id})
             return True
-        elif job.status == JobStatus.RUNNING:
+        if job.status == JobStatus.RUNNING:
             job.cancelling()
             logger.info("Marked running job for cancellation", extra={"job_id": job_id})
             return True

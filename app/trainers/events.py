@@ -7,6 +7,11 @@ class TrainingEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class Started(TrainingEvent):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class Progress(TrainingEvent):
     value: float
 
