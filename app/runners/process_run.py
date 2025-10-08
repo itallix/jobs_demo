@@ -76,6 +76,8 @@ def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection,
     def report(p: float):
         conn.send(Progress(float(p)))
 
+    # alt: another possible solution is to run the heartbeat in a separate daemon thread at a set interval, so it isn’t
+    # coupled to the training process.
     def heartbeat():
         if cancel_event.is_set():
             raise CancelledExc()

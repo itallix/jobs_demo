@@ -48,6 +48,7 @@ class JobScheduler:
         while self._running:
             try:
                 job = await self._jobs_q.next_runnable()
+                logger.info("Starting job", extra={"job_id": job.id})
                 self._start_job(job)
             except Exception:
                 logger.exception("Exception during supervise loop")
