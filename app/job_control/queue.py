@@ -21,16 +21,16 @@ class JobQueue:
         async with self._lock:
             self._by_id[job.id] = job
             self._order.append(job.id)
-            logger.info("Submitted job", extra={"job_id": job.id})
+            logger.info("Submitted job with ID: %s", job.id)
             await self._queue.put(job)
 
     async def next_runnable(self) -> Job | None:
         """Get the next non-canceled job from the queue (FIFO order)."""
         job = await self._queue.get()
         if job.status == JobStatus.CANCELLED:
-            logger.info("Skipping cancelled job", extra={"job_id": job.id})
+            logger.info("Skipping cancelled job with ID: %s", job.id)
             return None
-        logger.debug("Retrieved job from queue", extra={"job_id": job.id, "status": job.status})
+        logger.debug("Retrieved job from queue ID: %s, status: %s", job.id, job.status)
         return job
 
     def get(self, job_id: UUID) -> Job | None:
@@ -52,11 +52,11 @@ class JobQueue:
             return False
         if job.status == JobStatus.PENDING:
             job.cancel()
-            logger.info("Cancelled pending job", extra={"job_id": job_id})
+            logger.info("Cancelled pending job with ID: %s", job_id)
             return True
         if job.status == JobStatus.RUNNING:
             job.cancelling()
-            logger.info("Marked running job for cancellation", extra={"job_id": job_id})
+            logger.info("Marked running job for cancellation, ID: %s", job_id)
             return True
         return False
 

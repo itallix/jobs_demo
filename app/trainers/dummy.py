@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 class DummyTrainer(Trainer):
     def train(self, job: Job, report: ReportFn, heartbeat: HeartbeatFn) -> None:
         logger.info("Training started. Job ID: %s", job.id)
-        # Implement OTX training logic here
-
         # Simulate training with progress reporting
         step_count = 10
         for i in range(step_count):

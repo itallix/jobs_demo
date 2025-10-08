@@ -50,7 +50,7 @@ class JobScheduler:
                 job = await self._jobs_q.next_runnable()
                 if not job:
                     continue
-                logger.info("Starting job", extra={"job_id": job.id})
+                logger.info("Starting job with ID: %s", job.id)
                 self._start_job(job)
             except Exception:
                 logger.exception("Exception during supervise loop")
@@ -77,7 +77,7 @@ class JobScheduler:
                 with contextlib.suppress(asyncio.CancelledError):
                     await cancel_task
 
-            logger.info("Job completed", extra={"job_id": job.id, "job_status": job.status})
+            logger.info("Job completed, job_id: %s", job.id)
 
     def _setup_job_execution(self, job: Job, job_run: Runner, event_q: asyncio.Queue) -> asyncio.Task:
         """Set up event pumping thread and cancellation monitoring task."""

@@ -68,7 +68,7 @@ async def stream_job(
             if not j:
                 break
             snap = JobView.of(j).model_dump_json()
-            logger.info("snap: %s", snap)
+            logger.debug("snap: %s", snap)
             if snap != last:
                 yield f"data: {snap}\n\n"
                 last = snap

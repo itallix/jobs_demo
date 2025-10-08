@@ -12,6 +12,10 @@ from app.routers import job_router
 from app.runners import ProcessRunnerFactory
 from app.trainers import DummyTrainer, TrainerFactory
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
