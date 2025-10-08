@@ -1,5 +1,5 @@
 from app.models import Job
-from app.training.base import HeartbeatFn, ReportFn, Trainer
+from app.trainers.base import HeartbeatFn, ReportFn, Trainer
 
 
 class OTXTrainer(Trainer):
