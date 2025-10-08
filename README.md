@@ -1,6 +1,8 @@
 # Async Jobs Scheduler
 
-This project is an asynchronous job scheduler implemented in Python using FastAPI and `asyncio`. It allows you to submit, track, and manage jobs concurrently, making it suitable for applications that require non-blocking operations and scalable job processing.
+Job scheduler implemented in Python using FastAPI and `asyncio`. 
+It allows to submit, track, and manage jobs concurrently.
+Job execution context is separated from job management, allowing to plug in different training backends (e.g., OTX, PyTorch).
 
 ## Features
 

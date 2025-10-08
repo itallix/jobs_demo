@@ -1,0 +1,73 @@
+sequenceDiagram
+    participant API
+    participant JobQueue
+    participant JobScheduler
+    participant ProcessRun
+    participant Process
+    participant Trainer
+    participant Pipe
+
+    Note over JobScheduler: Supervisor task running<br/>(async loop)
+
+    rect rgb(200, 220, 255)
+
+        Note right of API: Job Submission Flow
+
+        API->>JobQueue: submit_job(job)
+        activate JobQueue
+        JobQueue->>JobQueue: submit(job)
+        JobQueue-->>API: job
+        deactivate JobQueue
+
+        loop Poll JobQueue (async)
+            JobScheduler->>JobQueue: next_runnable()
+            %% activate JobScheduler
+            JobQueue-->>JobScheduler: job
+        end
+
+        Note right of JobScheduler: New async task starts here
+        rect rgb(200, 240, 255)
+
+        JobScheduler->>ProcessRun: start_job()
+        activate ProcessRun
+
+        ProcessRun->>Pipe: create_pipe()
+        activate Pipe
+        ProcessRun->>Process: spawn(target=entrypoint)
+        activate Process
+
+        Process->>Pipe: send(Started())
+        Pipe-->>ProcessRun: event: Started
+        ProcessRun-->>JobScheduler: event: Started
+        JobScheduler-->>JobQueue: job.start()
+
+        Process->>Trainer: train(job, report, heartbeat)
+
+        activate Trainer
+        rect rgb(200, 220, 200)
+            loop Training Trainer (sync)
+                Trainer->>Pipe: report(progress=10)
+                Pipe-->>ProcessRun: event: Progress(10)
+                ProcessRun-->>JobScheduler: event: Progress(10)
+                JobScheduler-->>JobQueue: job.advance(10)
+
+                Trainer->>Pipe: report(progress=100)
+                Pipe-->>ProcessRun: event: Progress(100)
+                ProcessRun-->>JobScheduler: event: Progress(100)
+                JobScheduler-->>JobQueue: job.advance(100)
+            end
+        end
+        deactivate Trainer
+
+        Process->>Pipe: send(Done())
+        deactivate Process
+        Pipe-->>ProcessRun: event: Done()
+        ProcessRun-->>JobScheduler: event: Done()
+        JobScheduler-->>JobQueue: job.finish()
+        deactivate ProcessRun
+        deactivate Pipe
+        end
+        %% deactivate JobScheduler
+    end
+
+    Note over Pipe: Domain Events:<br/>- Started<br/>- Progress<br/>- Done<br/>- Cancelled<br/>- Failed
