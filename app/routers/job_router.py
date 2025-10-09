@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from starlette.responses import StreamingResponse
 
 from app.job_control import JobQueue
+from app.job_control.queue import CancellationResult
 from app.models import Job, JobStatus, now_utc_ts
 from app.routers.dependencies import get_queue
 from app.schema import JobView, SubmitJobRequest
@@ -41,14 +42,19 @@ async def get_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) 
 @router.patch("/{job_id}/cancel", response_model=JobView, status_code=status.HTTP_202_ACCEPTED)
 async def cancel_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
     """Cancel a job by its ID."""
-    result = queue.cancel(job_id)
-    # todo: distinguish between not found and already completed (consider other states)
-    if not result:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job not found or already completed")
-    job = queue.get(job_id)
-    if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    return JobView.of(job)
+    try:
+        job, result = queue.cancel(job_id)
+        match result:
+            case CancellationResult.NOT_FOUND:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+            case CancellationResult.IGNORE_CANCEL:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job already completed or cancelled")
+            case CancellationResult.PENDING_CANCELLED | CancellationResult.RUNNING_CANCELLING:
+                if job:
+                    return JobView.of(job)
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Job not found")
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Unable to cancel job")
 
 
 @router.get("/{job_id}/stream")

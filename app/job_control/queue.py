@@ -1,10 +1,20 @@
 import asyncio
 import logging
+from enum import StrEnum
 from uuid import UUID
 
 from app.models import Job, JobStatus
 
 logger = logging.getLogger(__name__)
+
+
+class CancellationResult(StrEnum):
+    """Outcome of a job cancellation request."""
+
+    PENDING_CANCELLED = "pending_cancelled"
+    RUNNING_CANCELLING = "running_cancelling"
+    IGNORE_CANCEL = "ignore_cancel"
+    NOT_FOUND = "not_found"
 
 
 class JobQueue:
@@ -50,20 +60,32 @@ class JobQueue:
         """List all non-completed jobs."""
         return [job for job in self._by_id.values() if job.status < JobStatus.DONE]
 
-    def cancel(self, job_id: UUID) -> bool:
-        """Mark a job as cancelled. If the job is pending, it will be removed from the queue."""
+    def cancel(self, job_id: UUID) -> tuple[Job | None, CancellationResult]:
+        """
+        Attempt to cancel a job by its ID.
+
+        This method handles job cancellation based on the current job status:
+        - PENDING jobs are marked as cancelled (CANCELLED state)
+        - RUNNING jobs are marked for cancellation (CANCELLING state)
+        - Jobs already in CANCELLING or terminal states are ignored
+        - Non-existent jobs return NOT_FOUND
+        """
         job = self._by_id.get(job_id)
-        if not job or job.status >= JobStatus.DONE:
-            return False
+        if not job:
+            return None, CancellationResult.NOT_FOUND
+        if job.status >= JobStatus.CANCELLING:
+            logger.debug("Ignore cancellation for terminal job (status: %s, id: %s)", job.status, job.id)
+            return None, CancellationResult.IGNORE_CANCEL
         if job.status == JobStatus.PENDING:
             job.cancel()
             logger.info("Cancelled pending job with ID: %s", job_id)
-            return True
+            return job, CancellationResult.PENDING_CANCELLED
         if job.status == JobStatus.RUNNING:
             job.cancelling()
             logger.info("Marked running job for cancellation, ID: %s", job_id)
-            return True
-        return False
+            return job, CancellationResult.RUNNING_CANCELLING
+
+        raise ValueError(f"Unexpected job status: {job.status}")
 
     def is_cancelling(self, job_id: UUID) -> bool:
         """Check if a job is marked as being cancelled."""
