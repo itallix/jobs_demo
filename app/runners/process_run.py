@@ -1,23 +1,26 @@
 import asyncio
 import contextlib
+import logging
 import multiprocessing as mp
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from multiprocessing.connection import Connection
 from multiprocessing.context import SpawnProcess
 from multiprocessing.synchronize import Event
 
 from app.models import Job
+from app.runnables.base import ExecutionContext, RunnableFactory
+from app.runnables.events import Done, Failed, RunnableEvent, Started
 from app.runners.base import Runner
-from app.trainers.base import Trainer, TrainerFactory
-from app.trainers.events import Done, Failed, Started, TrainingEvent
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessRun:
     """Owns the child Process+IPC and translates to domain events."""
 
-    def __init__(self, ctx: mp.context.SpawnContext, trainer_factory: Callable[[], Trainer], job: Job):
+    def __init__(self, ctx: mp.context.SpawnContext, runnable_factory: RunnableFactory, job: Job):
         self._ctx = ctx
-        self._trainer_factory = trainer_factory
+        self._runnable_factory = runnable_factory
         self._job = job
         self._parent, self._child = ctx.Pipe(duplex=False)
         self._cancel = ctx.Event()
@@ -26,19 +29,19 @@ class ProcessRun:
     def start(self) -> "ProcessRun":
         self._proc = self._ctx.Process(
             target=_entrypoint,
-            args=(self._trainer_factory, self._job.model_dump_json(), self._child, self._cancel),
+            args=(self._runnable_factory, self._job.model_dump_json(), self._child, self._cancel),
             name=f"trainer-{self._job.id}",
         )
         self._proc.start()
         self._child.close()
         return self
 
-    def events(self) -> Iterator[TrainingEvent]:
+    def events(self) -> Iterator[RunnableEvent]:
         """Blocking iterator; the control plane decides how to multiplex."""
         try:
             while True:
                 msg = self._parent.recv()  # blocks
-                yield msg  # msg is already a TrainerEvent instance (Progress/Done/...)
+                yield msg
         except EOFError:
             # Child exited; infer outcome
             code = self._proc.exitcode if self._proc else 1
@@ -46,38 +49,51 @@ class ProcessRun:
         finally:
             self._parent.close()
 
-    async def stop(self, wait_for: float = 6.0, kill_timeout: float = 1.0) -> None:
-        """Stop the training process.
+    async def stop(self, graceful_timeout: float = 6.0, term_timeout: float = 3.0, kill_timeout: float = 1.0) -> None:
+        """
+        Stop the process with graceful degradation.
 
         Args:
-            wait_for: How long to wait for graceful shutdown (seconds)
-            kill_timeout: How long to wait for process.join() after killing (seconds)
+            graceful_timeout: How long to wait for graceful shutdown (seconds)
+            term_timeout: How long to wait after SIGTERM (seconds)
+            kill_timeout: How long to wait after SIGKILL (seconds)
         """
         if self._proc is None:
             return
 
+        # Request graceful shutdown
         self._cancel.set()
 
-        try:
-            await asyncio.to_thread(self._proc.join, timeout=wait_for)
-        except TimeoutError:
-            if self._proc.is_alive():
-                self._proc.kill()
-                # Give it a final chance to clean up
-                await asyncio.to_thread(self._proc.join, timeout=kill_timeout)
+        # Try graceful shutdown
+        await asyncio.to_thread(self._proc.join, timeout=graceful_timeout)
+        if not self._proc.is_alive():
+            logger.debug("Process %s stopped gracefully", self._proc.name)
+            return
 
-        self._parent.close()
+        # Try SIGTERM
+        self._proc.terminate()
+        await asyncio.to_thread(self._proc.join, timeout=term_timeout)
+        if not self._proc.is_alive():
+            logger.debug("Process %s terminated gracefully", self._proc.name)
+            return
+
+        # Last resort: SIGKILL
+        logger.warning("Force killing process %s", self._proc.name)
+        self._proc.kill()
+        await asyncio.to_thread(self._proc.join, timeout=kill_timeout)
+        if self._proc.is_alive():
+            logger.error("Process %s doesn't respond to SIGKILL", self._proc.name)
 
 
-def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection, cancel_event: Event) -> None:
+def _entrypoint(get_runnable: RunnableFactory, job_payload: str, conn: Connection, cancel_event: Event) -> None:
     import traceback
 
-    from app.trainers.events import Cancelled, Done, Failed, Progress
+    from app.runnables.events import Cancelled, Done, Failed, Progress
 
     class CancelledExc(Exception):
         pass
 
-    trainer = get_trainer()
+    runnable = get_runnable()
     job = Job.model_validate_json(job_payload)
 
     def report(p: float):
@@ -91,7 +107,7 @@ def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection,
 
     try:
         conn.send(Started())
-        trainer.train(job, report, heartbeat)
+        runnable.run(ExecutionContext(job=job, report_progress=report, heartbeat=heartbeat))
         conn.send(Done())
     except CancelledExc:
         conn.send(Cancelled())
@@ -105,10 +121,10 @@ def _entrypoint(get_trainer: TrainerFactory, job_payload: str, conn: Connection,
 class ProcessRunnerFactory:
     """Process-based infra with spawned context"""
 
-    def __init__(self, trainer_factory: Callable[[], Trainer]) -> None:
+    def __init__(self, runnable_factory: RunnableFactory) -> None:
         # consider using native context for python 3.14 due to upgrade to 'fork_server' model
         self._ctx = mp.get_context("spawn")
-        self._trainer_factory = trainer_factory
+        self._runnable_factory = runnable_factory
 
     def for_job(self, job: Job) -> Runner:
-        return ProcessRun(self._ctx, self._trainer_factory, job)
+        return ProcessRun(self._ctx, self._runnable_factory, job)

@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -7,7 +7,7 @@ from app.models import Job, JobStatus
 
 
 class SubmitJobRequest(BaseModel):
-    id: UUID
+    id: UUID = Field(description="Job ID", default_factory=uuid4)
     project_id: UUID | None = Field(None, description="Project ID")
     model_revision_id: UUID | None = Field(None, description="Model revision ID")
     payload: dict | None = Field(None, description="Training job configuration")

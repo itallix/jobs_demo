@@ -6,22 +6,35 @@ import threading
 from app.job_control.capacity import Capacity
 from app.job_control.queue import JobQueue
 from app.models import Job
+from app.runnables.events import Cancelled, Done, Failed, Progress, Started
 from app.runners.base import Runner, RunnerFactory
-from app.trainers.events import Cancelled, Done, Failed, Progress, Started
 
 logger = logging.getLogger(__name__)
 
 
 class JobScheduler:
     """
-    Event-driven control plane for jobs.
+    Asynchronous job orchestration system with capacity management and event-driven control.
 
-    Runs the training job in a separate context and handles communication with it via domain events.
+    Manages concurrent job execution through an event-driven architecture, coordinating between
+    a job queue, runner processes, and capacity constraints. Jobs execute in isolated contexts
+    (typically separate processes) to prevent blocking the event loop and contain failures.
 
-    Note: Job orchestration is performed using asyncio to keep the event loop responsive.
-    Training itself runs in a context defined by runner factory:
-        - process-based runner make sure CPU-bound tasks do not block the event loop and crashes in training do not
-        affect the main application.
+    Architecture:
+        - Supervisor loop: Continuously polls the job queue for runnable jobs
+        - Capacity control: Enforces maximum parallel job limits via semaphore-based permits
+        - Event-driven communication: Jobs emit domain events (Started, Progress, Done, etc.)
+          which are pumped from runner threads to the async event loop for state management
+        - Cancellation support: Monitors cancellation requests and triggers graceful shutdowns
+
+    The scheduler maintains separation between CPU-intensive job execution (handled by runners
+    in separate processes/threads) and lightweight async orchestration (job lifecycle management,
+    event handling, capacity control).
+
+    Args:
+        jobs_queue: Source of jobs to execute and cancellation state tracker
+        runner_factory: Creates appropriate runner contexts for different job types
+        max_parallel_jobs: Maximum number of jobs that can execute simultaneously
     """
 
     def __init__(self, jobs_queue: JobQueue, runner_factory: RunnerFactory, max_parallel_jobs: int) -> None:
@@ -54,7 +67,6 @@ class JobScheduler:
                 self._start_job(job)
             except Exception:
                 logger.exception("Exception during supervise loop")
-            await asyncio.sleep(0.5)
 
     def _start_job(self, job: Job) -> None:
         task = asyncio.create_task(self._run_job(job))

@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.job_control import JobQueue, JobScheduler
 from app.routers import job_router
+from app.runnables import DummyTrainer, RunnableFactory
 from app.runners import ProcessRunnerFactory
-from app.trainers import DummyTrainer, TrainerFactory
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +33,7 @@ def detect_gpu_slots(default: int = 1) -> int:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Lifespan context manager to handle startup and shutdown events."""
     q = JobQueue()
-    trainer_factory = TrainerFactory(DummyTrainer)
+    trainer_factory = RunnableFactory(DummyTrainer)
     process_runner_factory = ProcessRunnerFactory(trainer_factory)
     job_scheduler = JobScheduler(
         jobs_queue=q, runner_factory=process_runner_factory, max_parallel_jobs=detect_gpu_slots()

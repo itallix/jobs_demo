@@ -11,7 +11,7 @@ class JobQueue:
     """Holds all jobs in memory: provides FIFO order and state queries."""
 
     def __init__(self) -> None:
-        self._queue: asyncio.Queue = asyncio.Queue()
+        self._queue: asyncio.Queue[Job] = asyncio.Queue()
         self._by_id: dict[UUID, Job] = {}
         self._order: list[UUID] = []  # preserve submit order for listing
         self._lock = asyncio.Lock()
@@ -24,14 +24,19 @@ class JobQueue:
             logger.info("Submitted job with ID: %s", job.id)
             await self._queue.put(job)
 
-    async def next_runnable(self) -> Job | None:
+    async def next_runnable(self) -> Job:
         """Get the next non-canceled job from the queue (FIFO order)."""
-        job = await self._queue.get()
-        if job.status == JobStatus.CANCELLED:
-            logger.info("Skipping cancelled job with ID: %s", job.id)
-            return None
-        logger.debug("Retrieved job from queue ID: %s, status: %s", job.id, job.status)
-        return job
+        while True:
+            job = await self._queue.get()
+            if job is None:
+                logger.debug("Received None from job queue, skipping")
+                await asyncio.sleep(0.5)
+                continue
+            if job.status == JobStatus.CANCELLED:
+                logger.info("Skipping cancelled job with ID: %s", job.id)
+                continue
+            logger.debug("Retrieved job from queue ID: %s, status: %s", job.id, job.status)
+            return job
 
     def get(self, job_id: UUID) -> Job | None:
         """Get a job by its ID."""

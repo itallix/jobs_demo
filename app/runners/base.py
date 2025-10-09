@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from typing import Protocol
 
 from app.models import Job
-from app.trainers.events import TrainingEvent
+from app.runnables.events import RunnableEvent
 
 
 class Runner(Protocol):
@@ -13,8 +13,10 @@ class Runner(Protocol):
     """
 
     def start(self) -> "Runner": ...
-    def events(self) -> Iterator[TrainingEvent]: ...
-    async def stop(self, wait_for: float = 6.0, kill_timeout: float = 1.0) -> None: ...
+    def events(self) -> Iterator[RunnableEvent]: ...
+    async def stop(
+        self, graceful_timeout: float = 6.0, term_timeout: float = 3.0, kill_timeout: float = 1.0
+    ) -> None: ...
 
 
 class RunnerFactory(Protocol):
