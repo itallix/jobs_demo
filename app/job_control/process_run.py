@@ -7,10 +7,8 @@ from multiprocessing.connection import Connection
 from multiprocessing.context import SpawnProcess
 from multiprocessing.synchronize import Event
 
-from app.models import Job
-from app.runnables.base import ExecutionContext, RunnableFactory
-from app.runnables.events import Done, Failed, RunnableEvent, Started
-from app.runners.base import Runner
+from app.models import Done, ExecutionEvent, Failed, Job, Started
+from app.run import ExecutionContext, RunnableFactory, Runner
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +34,7 @@ class ProcessRun:
         self._child.close()
         return self
 
-    def events(self) -> Iterator[RunnableEvent]:
+    def events(self) -> Iterator[ExecutionEvent]:
         """Blocking iterator; the control plane decides how to multiplex."""
         try:
             while True:
@@ -88,7 +86,7 @@ class ProcessRun:
 def _entrypoint(get_runnable: RunnableFactory, job_payload: str, conn: Connection, cancel_event: Event) -> None:
     import traceback
 
-    from app.runnables.events import Cancelled, Done, Failed, Progress
+    from app.models.events import Cancelled, Done, Failed, Progress
 
     class CancelledExc(Exception):
         pass
@@ -126,5 +124,5 @@ class ProcessRunnerFactory:
         self._ctx = mp.get_context("spawn")
         self._runnable_factory = runnable_factory
 
-    def for_job(self, job: Job) -> Runner:
+    def for_job(self, job: Job) -> Runner[Job, ExecutionEvent]:
         return ProcessRun(self._ctx, self._runnable_factory, job)

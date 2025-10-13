@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from app.runnables.base import ExecutionContext
+from ..runnable import ExecutionContext
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)

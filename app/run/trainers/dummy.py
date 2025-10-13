@@ -1,7 +1,7 @@
 import logging
 import time
 
-from app.runnables.trainers import Trainer, TrainerContext
+from .base import Trainer, TrainerContext
 
 logger = logging.getLogger(__name__)
 

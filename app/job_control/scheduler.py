@@ -5,9 +5,8 @@ import threading
 
 from app.job_control.capacity import Capacity
 from app.job_control.queue import JobQueue
-from app.models import Job
-from app.runnables.events import Cancelled, Done, Failed, Progress, Started
-from app.runners.base import Runner, RunnerFactory
+from app.models import Job, Cancelled, Done, Failed, Progress, Started
+from app.run import Runner, RunnerFactory
 
 logger = logging.getLogger(__name__)
 

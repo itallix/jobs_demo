@@ -7,10 +7,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.job_control import JobQueue, JobScheduler
+from app.job_control import JobQueue, JobScheduler, ProcessRunnerFactory
 from app.routers import job_router
-from app.runnables import DummyTrainer, RunnableFactory
-from app.runners import ProcessRunnerFactory
+from app.run import DummyTrainer, RunnableFactory
 
 logging.basicConfig(
     level=logging.INFO,

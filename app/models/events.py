@@ -2,30 +2,30 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class RunnableEvent:
+class ExecutionEvent:
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class Started(RunnableEvent):
+class Started(ExecutionEvent):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class Progress(RunnableEvent):
+class Progress(ExecutionEvent):
     value: float
 
 
 @dataclass(frozen=True, slots=True)
-class Done(RunnableEvent):
+class Done(ExecutionEvent):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class Cancelled(RunnableEvent):
+class Cancelled(ExecutionEvent):
     pass
 
 
 @dataclass(frozen=True, slots=True)
-class Failed(RunnableEvent):
+class Failed(ExecutionEvent):
     details: str
