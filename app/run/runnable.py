@@ -2,15 +2,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
 
-from app.models import Job
-
 ReportFn = Callable[[float], None]
 HeartbeatFn = Callable[[], None]
+T = TypeVar("T")
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
-class ExecutionContext:
-    job: Job
+class ExecutionContext[T]:
+    task: T
     report_progress: ReportFn
     heartbeat: HeartbeatFn
 

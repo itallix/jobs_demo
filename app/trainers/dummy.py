@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class DummyTrainer(Trainer):
     def run(self, ctx: TrainerContext) -> None:
-        job_id = ctx.job.id
+        job_id = ctx.task.id
         logger.info("Training started. Job ID: %s", job_id)
         # Simulate training with progress reporting
         step_count = 10

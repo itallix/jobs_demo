@@ -1,4 +1,4 @@
-from app.runnables.trainers import Trainer, TrainerContext
+from .base import Trainer, TrainerContext
 
 
 class OTXTrainer(Trainer):

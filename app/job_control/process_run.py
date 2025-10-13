@@ -105,7 +105,7 @@ def _entrypoint(get_runnable: RunnableFactory, job_payload: str, conn: Connectio
 
     try:
         conn.send(Started())
-        runnable.run(ExecutionContext(job=job, report_progress=report, heartbeat=heartbeat))
+        runnable.run(ExecutionContext(task=job, report_progress=report, heartbeat=heartbeat))
         conn.send(Done())
     except CancelledExc:
         conn.send(Cancelled())
