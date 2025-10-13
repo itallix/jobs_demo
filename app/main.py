@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.job_control import JobQueue, JobScheduler, ProcessRunnerFactory
 from app.routers import job_router
-from app.run import DummyTrainer, RunnableFactory
+from app.run import RunnableFactory
+from app.trainers import DummyTrainer
 
 logging.basicConfig(
     level=logging.INFO,
