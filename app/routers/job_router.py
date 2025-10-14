@@ -1,0 +1,93 @@
+import asyncio
+import logging
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from starlette.responses import StreamingResponse
+
+from app.job_control import JobQueue
+from app.job_control.queue import CancellationResult
+from app.models import Job, JobStatus, now_utc_ts
+from app.routers.dependencies import get_queue
+from app.schema import JobView, SubmitJobRequest
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
+
+
+@router.post("", response_model=JobView, status_code=status.HTTP_202_ACCEPTED)
+async def submit_job(req: SubmitJobRequest, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
+    """Submit a new job to the queue."""
+    job = Job(id=req.id, status=JobStatus.PENDING, submitted_at=now_utc_ts())
+    await queue.submit(job)
+    return JobView.of(job)
+
+
+@router.get("", response_model=list[JobView])
+async def list_jobs(queue: Annotated[JobQueue, Depends(get_queue)]) -> list[JobView]:
+    """List all jobs in the queue."""
+    return [JobView.of(job) for job in queue.list_all()]
+
+
+@router.get("/{job_id}", response_model=JobView)
+async def get_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
+    """Get job details by its ID."""
+    job = queue.get(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return JobView.of(job)
+
+
+@router.patch("/{job_id}/cancel", response_model=JobView, status_code=status.HTTP_202_ACCEPTED)
+async def cancel_job(job_id: UUID, queue: Annotated[JobQueue, Depends(get_queue)]) -> JobView:
+    """Cancel a job by its ID."""
+    try:
+        job, result = queue.cancel(job_id)
+        match result:
+            case CancellationResult.NOT_FOUND:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+            case CancellationResult.IGNORE_CANCEL:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job already completed or cancelled")
+            case CancellationResult.PENDING_CANCELLED | CancellationResult.RUNNING_CANCELLING:
+                if job:
+                    return JobView.of(job)
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Job not found")
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Unable to cancel job")
+
+
+@router.get("/{job_id}/stream")
+async def stream_job(
+    job_id: UUID, request: Request, queue: Annotated[JobQueue, Depends(get_queue)]
+) -> StreamingResponse:
+    """Stream job status updates using Server-Sent Events (SSE)."""
+    if not queue.get(job_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    async def gen():
+        last = None
+        while True:
+            if await request.is_disconnected():
+                break
+            j = queue.get(job_id)
+            if not j:
+                break
+            snap = JobView.of(j).model_dump_json()
+            logger.debug("snap: %s", snap)
+            if snap != last:
+                yield f"data: {snap}\n\n"
+                last = snap
+            if j.status >= JobStatus.DONE:
+                break
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Content-Type": "text/event-stream",
+            "Connection": "keep-alive",
+            "Cache-Control": "no-cache",
+        },
+    )
